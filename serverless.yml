@@ -1,0 +1,50 @@
+service: bestOfTwitch
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-west-1
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:ListBucket"
+      Resource:
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - "Ref" : "ServerlessDeploymentBucket"
+    - Effect: "Allow"
+      Action:
+        - "s3:Get*"
+        - "s3:List*"
+      Resource:
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - "Ref" : "ServerlessDeploymentBucket"
+              - "/*"
+    - Effect: "Allow"
+      Action:
+        - "lambda:InvokeFunction"
+      Resource:
+          - "*"
+    - Effect: "Allow"
+      Action:
+        - "secretsmanager:GetSecretValue"
+      Resource:
+          - "*"
+
+  environment:
+    TWITCH_CLIENT_SECRET_NAME: Twitch-BestOfToday
+
+package:
+  individually: true
+
+functions:
+  main:
+    handler: src/main.handler
+    memorySize: 128
+    timeout: 10
+    package:
+      include:
+        - src/main.js
