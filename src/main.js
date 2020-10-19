@@ -4,11 +4,14 @@ console.log('Loading function')
 
 const aws = require('aws-sdk')
 const util = require('util')
+const got = require('got')
 
 exports.handler = async (event, context) => {
     console.log(`Parameters: ${JSON.stringify(event)}`)
 
-    console.log(`Client info: ${await getTwitchClientInfo()}`)
+    await getTwitchClientInfo()
+    .then((clientInfo) => getTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET))
+    .then((token) => console.log(`Token: ${token}`))
 }
 
 const getTwitchClientInfo = () => {
@@ -25,5 +28,12 @@ const getTwitchClientInfo = () => {
                 const decodedBinarySecret = buff.toString('ascii');
                 return decodedBinarySecret
             }
+        })
+}
+
+const getTwitchToken = (clientId, clientSecret) => {
+    got.post(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`)
+        .then((data) => {
+            return data.access_token
         })
 }

@@ -1,2 +1,3 @@
-Deploy with `npx serverless deploy --region us-west-1`
-Test with `npx serverless invoke --region us-west-1 -f main -l`
+Deploy with `npx serverless deploy
+
+Test with `npx serverless invoke -f main -l`
