@@ -36,6 +36,7 @@ provider:
 
   environment:
     TWITCH_CLIENT_SECRET_NAME: Twitch-BestOfToday
+    DYNAMODB_TABLE_NAME: BestOfTwitch
 
 package:
   individually: true

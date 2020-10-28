@@ -5,7 +5,6 @@ console.log('Loading function')
 const aws = require('aws-sdk')
 const util = require('util')
 const got = require('got')
-const { stringify } = require('querystring')
 
 exports.handler = async (event, context) => {
     console.info(`Parameters: ${JSON.stringify(event)}`)
@@ -37,19 +36,61 @@ const getTwitchClientInfo = () => {
         })
 }
 
-// TODO implement check to only get new token when needed
 const getTwitchToken = (clientId, clientSecret) => {
-    let url = `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`
-    console.debug(url)
-    return got.post(url)
-        .json()
-        .then((data) => {
-            console.debug(data)
-            return data.access_token
-        })
-        .catch((error) => {
-            console.error(`Error when getting token from twitch: ${error}`)
-        })
+    let dynamoDB = new aws.DynamoDB({ region: process.env.AWS_REGION })
+    const getItem = util.promisify(dynamoDB.getItem).bind(dynamoDB)
+    const putItem = util.promisify(dynamoDB.putItem).bind(dynamoDB)
+    return getItem({
+        "Key": {
+            "ClientId": {
+                S: clientId
+            }
+        },
+        "TableName": process.env.DYNAMODB_TABLE_NAME
+    })
+    .then((data) => {
+        console.debug(data)
+        if (data.Item === undefined) {
+            let url = `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`
+            console.debug(url)
+            return got.post(url)
+                .json()
+                .then((data) => {
+                    console.debug(data)
+                    return putItem({
+                        "Item": {
+                            "ClientId": {
+                                S: clientId
+                            },
+                            "APIToken": {
+                                S: data.access_token
+                            },
+                            "Expiry": {
+                                N: '' + (Math.floor(Date.now() / 1000) + data.expires_in)
+                            }
+                        },
+                        "TableName": process.env.DYNAMODB_TABLE_NAME
+                    })
+                    .then((twitchData) => {
+                        console.debug(twitchData)
+                        return data.access_token
+                    })
+                    .catch((error) => {
+                        console.error(`Error when storing twitch token in dynamodb: ${error}`)
+                    })
+                })
+                .catch((error) => {
+                    console.error(`Error when getting token from twitch: ${error}`)
+                })
+        }
+        else {
+            return data.Item.APIToken.S
+        }
+    })
+    .catch((error) => {
+        console.error(error)
+    })
+    
 }
 
 const getFollows = (twitchToken, clientId, user) => {
