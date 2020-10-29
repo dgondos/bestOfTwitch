@@ -13,7 +13,7 @@ exports.handler = async (event, context) => {
         .then((clientInfo) => getTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET).then((twitchToken) => [clientInfo, twitchToken]))
         .then(([clientInfo, twitchToken]) => getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID).then((twitchUserID) => [clientInfo, twitchToken, twitchUserID]))
         .then(([clientInfo, twitchToken, twitchUserID]) => getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserID).then((follows) => [clientInfo, twitchToken, follows]))
-        .then(([clientInfo, twitchToken, follows]) => getClips(twitchToken, clientInfo.CLIENT_ID, follows[0], event.utcHoursFrom, event.utcHoursTo))
+        .then(([clientInfo, twitchToken, follows]) => getClips(twitchToken, clientInfo.CLIENT_ID, follows[0], event.utcHoursFrom, event.utcHoursTo).then((data) => console.log(JSON.stringify(data))))
 }
 
 const getTwitchClientInfo = () => {
@@ -170,7 +170,11 @@ const getClips = (twitchToken, clientId, follow, utcHoursFrom, utcHoursTo) => {
                 }
                 else {
                     console.debug(data)
-                    return clips.concat(data.data)
+                    return {
+                        id: follow.to_id,
+                        name: follow.to_name,
+                        clips: clips.concat(data.data)
+                    }
                 }
             })
             .catch((error) => {
