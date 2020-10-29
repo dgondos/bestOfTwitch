@@ -13,7 +13,7 @@ exports.handler = async (event, context) => {
         .then((clientInfo) => getTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET).then((twitchToken) => [clientInfo, twitchToken]))
         .then(([clientInfo, twitchToken]) => getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID).then((twitchUserID) => [clientInfo, twitchToken, twitchUserID]))
         .then(([clientInfo, twitchToken, twitchUserID]) => getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserID).then((follows) => [clientInfo, twitchToken, follows]))
-        .then(([clientInfo, twitchToken, follows]) => console.debug(JSON.stringify(follows)))
+        .then(([clientInfo, twitchToken, follows]) => getClips(twitchToken, clientInfo.CLIENT_ID, follows[0], event.utcHoursFrom, event.utcHoursTo))
 }
 
 const getTwitchClientInfo = () => {
@@ -142,4 +142,40 @@ const getUser = (twitchLogin, twitchToken, clientId) => {
         .catch((error) => {
             console.error(`Error when getting user id from twitch: ${error}`)
         })
+}
+
+const getClips = (twitchToken, clientId, follow, utcHoursFrom, utcHoursTo) => {
+    const clipsRequest = (cursor, clips) => {
+        const startedAt = new Date()
+        startedAt.setUTCHours(utcHoursFrom, 0)
+        const endedAt = new Date()
+        endedAt.setUTCHours(utcHoursTo, 0)
+        let url = `https://api.twitch.tv/helix/clips?broadcaster_id=${follow.to_id}&first=100&started_at=${startedAt.toISOString()}&ended_at=${endedAt.toISOString()}`
+        if (cursor !== undefined) {
+            url = url + `&after=${cursor}`
+        }
+        console.debug(url)
+        return got.get(url, {
+            headers: {
+                "Authorization": `Bearer ${twitchToken}`,
+                "Client-Id": clientId
+            }
+        })
+            .json()
+            .then((data) => {
+                if (data.pagination !== undefined && data.pagination.cursor !== undefined) {
+                    console.debug(`paginating: ${data.pagination.cursor}`)
+                    console.debug(data)
+                    return clipsRequest(data.pagination.cursor, clips.concat(data.data))
+                }
+                else {
+                    console.debug(data)
+                    return clips.concat(data.data)
+                }
+            })
+            .catch((error) => {
+                console.error(`Error when getting clips from twitch for follow ${follow.to_name}: ${error}`)
+            })
+    }
+    return clipsRequest(undefined, [])
 }

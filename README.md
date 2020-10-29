@@ -18,6 +18,8 @@ The event data the function is called with should be in this format:
 
 ```
 {
-    "twitchUser": "<user to retrieve followers from>"
+    "twitchUser": "<user to retrieve followers from>",
+    "utcHoursFrom": "<Hour to start retrieving clips from, in UTC>",
+    "utcHoursTo": "<Hour to start retrieving clips until, in UTC>"
 }
 ```
