@@ -4,6 +4,7 @@ console.log('Loading function')
 
 const twitch = require('./twitchAPI')
 const aws = require('./awsAPI')
+const segmentProcessor = require('./segmentProcessor')
 
 exports.handler = async (event, context) => {
     console.info(`Parameters: ${JSON.stringify(event)}`)
@@ -11,9 +12,11 @@ exports.handler = async (event, context) => {
     await
         aws.getSecret(process.env.AWS_REGION, process.env.TWITCH_CLIENT_SECRET_NAME)
             .then((clientInfo) => getTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET).then((twitchToken) => [clientInfo, twitchToken]))
-            .then(([clientInfo, twitchToken]) => twitch.getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID).then((twitchUserID) => [clientInfo, twitchToken, twitchUserID]))
-            .then(([clientInfo, twitchToken, twitchUserID]) => twitch.getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserID).then((follows) => [clientInfo, twitchToken, follows]))
-            .then(([clientInfo, twitchToken, follows]) => twitch.getClips(twitchToken, clientInfo.CLIENT_ID, follows[0], event.utcHoursFrom, event.utcHoursTo).then((data) => console.log(JSON.stringify(data))))
+            // .then(([clientInfo, twitchToken]) => twitch.getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID).then((twitchUserID) => [clientInfo, twitchToken, twitchUserID]))
+            // .then(([clientInfo, twitchToken, twitchUserID]) => twitch.getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserID).then((follows) => [clientInfo, twitchToken, follows]))
+            .then(([clientInfo, twitchToken, follows]) => twitch.getClips(twitchToken, clientInfo.CLIENT_ID, follows, event.utcHoursFrom, event.utcHoursTo))
+            .then((clipsData) => Promise.resolve(segmentProcessor.getTopSegments(clipsData.clips, event.segmentResolution, event.maxSegments)))
+            .then((segments) => console.log(JSON.stringify(segments)))
 }
 
 const getTwitchToken = (clientId, clientSecret) => {

@@ -20,6 +20,8 @@ The event data the function is called with should be in this format:
 {
     "twitchUser": "<user to retrieve followers from>",
     "utcHoursFrom": "<Hour to start retrieving clips from, in UTC>",
-    "utcHoursTo": "<Hour to start retrieving clips until, in UTC>"
+    "utcHoursTo": "<Hour to start retrieving clips until, in UTC>",
+    "segmentResolution": "<The score of a segment in a vod is determined by the amount of clips generated within segmentResolution minutes>",
+    "maxSegments": "<The maximum segments to return per follow>"
 }
 ```
