@@ -1,8 +1,8 @@
 const got = require('got')
 
 exports.getClips = (twitchToken, clientId, follow, utcHoursFrom, utcHoursTo) => {
-    const fs = require('fs')
-    return Promise.resolve(JSON.parse(fs.readFileSync("sample.json")))
+    // const fs = require('fs')
+    // return Promise.resolve(JSON.parse(fs.readFileSync("sample.json")))
 
     const clipsRequest = (cursor, clips) => {
         const startedAt = new Date()
@@ -112,7 +112,7 @@ exports.convertFromTwitchDurationToMs = (twitchDuration) => {
         if (m.index === regex.lastIndex) {
             regex.lastIndex++;
         }
-        
+
         // The result can be accessed through the `m`-variable.
         m.forEach((match, groupIndex) => {
             if (groupIndex === 1 && match !== undefined) {
@@ -126,7 +126,7 @@ exports.convertFromTwitchDurationToMs = (twitchDuration) => {
             }
         });
     }
-    return ((hours*60*60) + (minutes*60) + seconds)*1000;
+    return ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000;
 }
 
 exports.convertMsToTwitchDuration = (msDuration) => {
@@ -134,4 +134,36 @@ exports.convertMsToTwitchDuration = (msDuration) => {
     const mins = Math.floor((msDuration - (hours * 1000 * 60 * 60)) / (1000 * 60))
     const secs = Math.floor((msDuration - (hours * 1000 * 60 * 60) - (mins * 1000 * 60)) / (1000))
     return `${hours}h${mins}m${secs}s`
+}
+
+exports.getVods = (twitchToken, clientId, follow) => {
+    const request = (cursor, vods) => {
+        let url = `https://api.twitch.tv/helix/videos?user_id=${follow.to_id}&first=100&period=day&sort=time&type=archive`
+        if (cursor !== undefined) {
+            url = url + `&after=${cursor}`
+        }
+        console.debug(url)
+        return got.get(url, {
+            headers: {
+                "Authorization": `Bearer ${twitchToken}`,
+                "Client-Id": clientId
+            }
+        })
+            .json()
+            .then((data) => {
+                if (data.pagination !== undefined && data.pagination.cursor !== undefined) {
+                    console.debug(`paginating: ${data.pagination.cursor}`)
+                    console.debug(data)
+                    return request(data.pagination.cursor, vods.concat(data.data))
+                }
+                else {
+                    console.debug(data)
+                    return vods.concat(data.data)
+                }
+            })
+            .catch((error) => {
+                console.error(`Error when getting vods from twitch: ${error}`)
+            })
+    }
+    return request(undefined, [])
 }

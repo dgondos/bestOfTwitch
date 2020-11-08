@@ -9,17 +9,24 @@ const segmentProcessor = require('./segmentProcessor')
 exports.handler = async (event, context) => {
     console.info(`Parameters: ${JSON.stringify(event)}`)
 
-    await
-        aws.getSecret(process.env.AWS_REGION, process.env.TWITCH_CLIENT_SECRET_NAME)
-            .then((clientInfo) => getTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET).then((twitchToken) => [clientInfo, twitchToken]))
-            // .then(([clientInfo, twitchToken]) => twitch.getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID).then((twitchUserID) => [clientInfo, twitchToken, twitchUserID]))
-            // .then(([clientInfo, twitchToken, twitchUserID]) => twitch.getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserID).then((follows) => [clientInfo, twitchToken, follows]))
-            .then(([clientInfo, twitchToken, follows]) => twitch.getClips(twitchToken, clientInfo.CLIENT_ID, follows, event.utcHoursFrom, event.utcHoursTo))
-            .then((clipsData) => Promise.resolve(segmentProcessor.getTopSegments(clipsData.clips, event.segmentResolution, event.maxSegments)))
-            .then((segments) => console.log(JSON.stringify(segments)))
+    const getClientInfo = aws.getSecret(process.env.AWS_REGION, process.env.TWITCH_CLIENT_SECRET_NAME)
+    const getTwitchToken = getClientInfo.then((clientInfo) => manageTwitchToken(clientInfo.CLIENT_ID, clientInfo.CLIENT_SECRET))
+    const getTwitchUserId = Promise.all([getClientInfo, getTwitchToken]).then(([clientInfo, twitchToken]) => twitch.getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID))
+    const getFollows = Promise.all([getTwitchToken, getClientInfo, getTwitchUserId]).then(([twitchToken, clientInfo, twitchUserId]) => twitch.getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserId))
+    await Promise.all([getTwitchToken, getClientInfo, getFollows]).then(([twitchToken, clientInfo, follows]) => {
+        for (let follow of follows) {
+            const getClips = twitch.getClips(twitchToken, clientInfo.CLIENT_ID, follow, event.utcHoursFrom, event.utcHoursTo)
+            const getSegments = getClips.then((clipsData) => segmentProcessor.getTopSegments(clipsData.clips, event.segmentResolution, event.maxSegments))
+            const getLinks = getSegments.then((segments) => getVodLinks(twitchToken, clientInfo.CLIENT_ID, follow, segments))
+            getLinks.then((links) => {
+                console.log(`For follow ${follow.to_name}`)
+                console.log(JSON.stringify(links))
+            })
+        }
+    })
 }
 
-const getTwitchToken = (clientId, clientSecret) => {
+const manageTwitchToken = (clientId, clientSecret) => {
     return aws.getDynamoDBItem(process.env.AWS_REGION, process.env.DYNAMODB_TABLE_NAME, "ClientId", clientId)
         .then((data) => {
             console.debug(data)
@@ -56,5 +63,28 @@ const getTwitchToken = (clientId, clientSecret) => {
         })
         .catch((error) => {
             console.error(`Error when retrieving twitch token from dynamoDB: ${error}`)
+        })
+}
+
+const getVodLinks = (twitchToken, clientId, follow, segments) => {
+    return twitch.getVods(twitchToken, clientId, follow)
+        .then((vods) => {
+            let links = []
+            for (const segment of segments) {
+                let vodFound = false
+                for (let vod of vods) {
+                    const created_at = Date.parse(vod.created_at)
+                    const ended_at = created_at + twitch.convertFromTwitchDurationToMs(vod.duration)
+                    if (segment.start >= created_at && segment.end <= ended_at) {
+                        links.push({ url: `${vod.url}?t=${twitch.convertMsToTwitchDuration(segment.start)}`, segment: segment })
+                        vodFound = true
+                        break
+                    }
+                }
+                if (!vodFound) {
+                    console.error(`No vod found for follow ${follow.to_name}, segment ${segment.start}/${segment.end}!`)
+                }
+            }
+            return links
         })
 }
