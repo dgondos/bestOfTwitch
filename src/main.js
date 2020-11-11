@@ -29,11 +29,9 @@ exports.handler = async (event, context) => {
 const manageTwitchToken = (clientId, clientSecret) => {
     return aws.getDynamoDBItem(process.env.AWS_REGION, process.env.DYNAMODB_TABLE_NAME, "ClientId", clientId)
         .then((data) => {
-            console.debug(data)
             if (data.Item === undefined) {
                 twitch.getToken(clientId, clientSecret)
                     .then((data) => {
-                        console.debug(data)
                         return aws.putDynamoDBItem(process.env.AWS_REGION, process.env.DYNAMODB_TABLE_NAME, {
                             "ClientId": {
                                 S: clientId
@@ -46,7 +44,6 @@ const manageTwitchToken = (clientId, clientSecret) => {
                             }
                         })
                             .then((awsData) => {
-                                console.debug(awsData)
                                 return data.access_token
                             })
                             .catch((error) => {
@@ -76,7 +73,7 @@ const getVodLinks = (twitchToken, clientId, follow, segments) => {
                     const created_at = Date.parse(vod.created_at)
                     const ended_at = created_at + twitch.convertFromTwitchDurationToMs(vod.duration)
                     if (segment.start >= created_at && segment.end <= ended_at) {
-                        links.push({ url: `${vod.url}?t=${twitch.convertMsToTwitchDuration(segment.start)}`, segment: segment })
+                        links.push({ url: `${vod.url}?t=${twitch.convertMsToTwitchDuration(segment.start- created_at)}`, segment: segment })
                         vodFound = true
                         break
                     }
