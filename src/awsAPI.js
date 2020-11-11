@@ -44,3 +44,14 @@ exports.putDynamoDBItem = (region, tableName, item) => {
     }
     return putItem(req)
 }
+
+exports.pushSNS = (region, topic, subject, message) => {
+    let sns = new aws.SNS({ region: region })
+    const publish = util.promisify(sns.publish).bind(sns)
+    let req = {
+        Message: message,
+        Subject: subject,
+        TopicArn: topic
+      }
+    return publish(req)
+}

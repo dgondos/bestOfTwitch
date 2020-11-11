@@ -14,15 +14,34 @@ exports.handler = async (event, context) => {
     const getTwitchUserId = Promise.all([getClientInfo, getTwitchToken]).then(([clientInfo, twitchToken]) => twitch.getUser(event.twitchUser, twitchToken, clientInfo.CLIENT_ID))
     const getFollows = Promise.all([getTwitchToken, getClientInfo, getTwitchUserId]).then(([twitchToken, clientInfo, twitchUserId]) => twitch.getFollows(twitchToken, clientInfo.CLIENT_ID, twitchUserId))
     await Promise.all([getTwitchToken, getClientInfo, getFollows]).then(([twitchToken, clientInfo, follows]) => {
+        let linksPromises = []
         for (let follow of follows) {
             const getClips = twitch.getClips(twitchToken, clientInfo.CLIENT_ID, follow, event.utcHoursFrom, event.utcHoursTo)
             const getSegments = getClips.then((clipsData) => segmentProcessor.getTopSegments(clipsData.clips, event.segmentResolution, event.maxSegments))
             const getLinks = getSegments.then((segments) => getVodLinks(twitchToken, clientInfo.CLIENT_ID, follow, segments))
-            getLinks.then((links) => {
+            linksPromises.push(getLinks.then((links) => {
                 console.log(`For follow ${follow.to_name}`)
                 console.log(JSON.stringify(links))
-            })
+                let notifText = `# ${follow.to_name}\n\n`
+                for (let link of links) {
+                    notifText += `## Segment (Score: ${link.segment.score})\n\n`
+                    notifText += `URL: ${link.url}\n`
+                    notifText += `Start: ${link.segment.start}\n`
+                    notifText += `End: ${link.segment.end}\n\n`
+                }
+                return notifText
+            }))
         }
+        Promise.all(linksPromises).then((notifTextSegments) => {
+            let notifText = ""
+            for (let notifTextSegment of notifTextSegments) {
+                if (notifText !== "") {
+                    notifText += "\n\n"
+                }
+                notifText += notifTextSegment
+            }
+            aws.pushSNS(process.env.AWS_REGION, event.snsTopicARN, "BestOfTwitch Digest", notifText)
+        })
     })
 }
 
@@ -73,7 +92,7 @@ const getVodLinks = (twitchToken, clientId, follow, segments) => {
                     const created_at = Date.parse(vod.created_at)
                     const ended_at = created_at + twitch.convertFromTwitchDurationToMs(vod.duration)
                     if (segment.start >= created_at && segment.end <= ended_at) {
-                        links.push({ url: `${vod.url}?t=${twitch.convertMsToTwitchDuration(segment.start- created_at)}`, segment: segment })
+                        links.push({ url: `${vod.url}?t=${twitch.convertMsToTwitchDuration(segment.start - created_at)}`, segment: segment })
                         vodFound = true
                         break
                     }
