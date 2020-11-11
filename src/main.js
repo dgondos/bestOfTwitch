@@ -32,7 +32,7 @@ exports.handler = async (event, context) => {
                 return notifText
             }))
         }
-        Promise.all(linksPromises).then((notifTextSegments) => {
+        return Promise.all(linksPromises).then((notifTextSegments) => {
             let notifText = ""
             for (let notifTextSegment of notifTextSegments) {
                 if (notifText !== "") {
@@ -40,7 +40,7 @@ exports.handler = async (event, context) => {
                 }
                 notifText += notifTextSegment
             }
-            aws.pushSNS(process.env.AWS_REGION, event.snsTopicARN, "BestOfTwitch Digest", notifText)
+            return aws.pushSNS(process.env.AWS_REGION, event.snsTopicARN, "BestOfTwitch Digest", notifText)
         })
     })
 }

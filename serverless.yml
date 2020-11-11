@@ -33,6 +33,21 @@ provider:
         - "secretsmanager:GetSecretValue"
       Resource:
           - "*"
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:GetItem"
+      Resource:
+        - "*"
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:PutItem"
+      Resource:
+        - "*"
+    - Effect: "Allow"
+      Action:
+        - "SNS:Publish"
+      Resource:
+        - "*"
 
   environment:
     TWITCH_CLIENT_SECRET_NAME: Twitch-BestOfToday
