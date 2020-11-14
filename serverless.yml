@@ -60,7 +60,7 @@ functions:
   main:
     handler: src/main.handler
     memorySize: 128
-    timeout: 10
+    timeout: 180
     package:
       include:
         - src/main.js
