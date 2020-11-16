@@ -23,22 +23,27 @@ exports.handler = async (event, context) => {
                 console.log(`For follow ${follow.to_name}`)
                 console.log(JSON.stringify(links))
                 let notifText = `# ${follow.to_name}\n\n`
+                let highestScore = 0
                 for (let link of links) {
                     notifText += `## Segment (Score: ${link.segment.score})\n\n`
                     notifText += `URL: ${link.url}\n`
                     notifText += `Start: ${link.segment.start}\n`
                     notifText += `End: ${link.segment.end}\n\n`
+                    if (highestScore < link.segment.score) {
+                        highestScore = link.segment.score
+                    }
                 }
-                return notifText
+                return { score: highestScore, text: notifText }
             }))
         }
         return Promise.all(linksPromises).then((notifTextSegments) => {
             let notifText = ""
+            notifTextSegments.sort((a,b) => b.score - a.score)
             for (let notifTextSegment of notifTextSegments) {
                 if (notifText !== "") {
                     notifText += "\n\n"
                 }
-                notifText += notifTextSegment
+                notifText += notifTextSegment.text
             }
             return aws.pushSNS(process.env.AWS_REGION, event.snsTopicARN, "BestOfTwitch Digest", notifText)
         })
